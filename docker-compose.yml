@@ -1,0 +1,84 @@
+version: '3.8'
+
+services:
+  # ============================================================================
+  # Backend Microservice (FastAPI + AsyncIO + Worker Pipeline)
+  # ============================================================================
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: cleandesk_backend
+    ports:
+      - "8000:8000"
+    environment:
+      - HOST=0.0.0.0
+      - PORT=8000
+      - DEBUG=True
+      # Connect to MongoDB service or override with Atlas URL in .env
+      - MONGODB_URI=${MONGODB_URI:-mongodb://mongodb:27017/cleandesk_pipeline}
+      - MONGODB_DB_NAME=cleandesk_pipeline
+      # Connect to Redis container
+      - REDIS_URL=redis://redis:6379/0
+      - REDIS_QUEUE_NAME=cleandesk:interactions:queue
+      # Google Gemini AI key (pass from host environment or root .env)
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - GEMINI_MODEL=gemini-1.5-flash
+      # Rate Limiting & Account Protection
+      - MAX_DAILY_QUOTA_DEFAULT=50
+      - RISK_THRESHOLD_REJECTION=80
+      - INTER_MESSAGE_PACING_MS=750
+    depends_on:
+      redis:
+        condition: service_healthy
+      mongodb:
+        condition: service_started
+    restart: unless-stopped
+
+  # ============================================================================
+  # Frontend Web App (Next.js Universal Inbox & Webhook Simulator)
+  # ============================================================================
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: cleandesk_frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - NEXT_PUBLIC_WS_URL=ws://localhost:8000/ws/inbox
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  # ============================================================================
+  # Message Queue & Inter-Service Bus (Redis)
+  # ============================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: cleandesk_redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  # ============================================================================
+  # Primary Datastore (MongoDB)
+  # ============================================================================
+  mongodb:
+    image: mongo:7.0
+    container_name: cleandesk_mongodb
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    restart: unless-stopped
+
+volumes:
+  mongo_data:
+    driver: local
