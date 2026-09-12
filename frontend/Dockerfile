@@ -13,8 +13,8 @@ RUN npm install
 COPY . .
 
 # Set environment variables and build args for Next.js build
-ARG NEXT_PUBLIC_API_URL=http://localhost:8000
-ARG NEXT_PUBLIC_WS_URL=ws://localhost:8000/ws/inbox
+ARG NEXT_PUBLIC_API_URL=https://instasim-f9b2.onrender.com
+ARG NEXT_PUBLIC_WS_URL=wss://instasim-f9b2.onrender.com/ws/inbox
 
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_WS_URL=$NEXT_PUBLIC_WS_URL
